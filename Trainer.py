@@ -76,7 +76,7 @@ class Trainer:
             model.train()
 
     def setEval(self):
-        for model in self.model.values():
+        for model in self.models.values():
             model.eval()
 
     def saveModel(self):
