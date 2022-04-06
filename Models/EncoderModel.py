@@ -15,7 +15,7 @@ class EncoderModel(nn.Module):
                         }
         if numLayers > 34:
             self.numChannels[1:] *= 4
-        self.encoder = modelsDict[numLayers]()
+        self.encoder = modelsDict[numLayers](True)
 
     def forward(self, inputImg):
         self.features = []
