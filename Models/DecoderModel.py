@@ -19,9 +19,9 @@ class ConvBlock(nn.Module):
             out = self.conv(self.pad(x))
         return out
 
-class DecoderModel(nn.Module):
+class DepthDecoderModel(nn.Module):
     def __init__(self, numChannelsEncoder):
-        super(DecoderModel, self).__init__()
+        super(DepthDecoderModel, self).__init__()
         self.numChannelsEncoder = numChannelsEncoder
         self.numChannelsDecoder = np.array([16, 32, 64, 128, 256])
         self.convs = OrderedDict()
@@ -52,3 +52,32 @@ class DecoderModel(nn.Module):
                 out = self.convs[("dispconv", layer)](x)
                 self.outputs[("disp", layer)] = torch.sigmoid(out)
         return self.outputs
+
+class PoseDecoderModel(nn.Module):
+    def __init__(self, numChannelsEncoder):
+        super(PoseDecoderModel, self).__init__()
+        self.numChannelsEncoder = numChannelsEncoder
+        self.numFeaturesInput = 1
+        self.numFramesPredict = 2
+        self.convs = OrderedDict()
+        self.convs[("squeeze")] = nn.Conv2d(self.numChannelsEncoder[-1], 256, 1)
+        self.convs[("pose", 0)] = nn.Conv2d(self.numFeaturesInput*256, 256, 3, 1, 1)
+        self.convs[("pose", 1)] = nn.Conv2d(256, 256, 3, 1, 1)
+        self.convs[("pose", 2)] = nn.Conv2d(256, 6*self.numFramesPredict, 1)
+        self.relu = nn.ReLU()
+        self.decoder = nn.ModuleList(list(self.convs.values()))
+
+    def forward(self, inputFeatures):
+        lastFeatures = [feature[-1] for feature in inputFeatures]
+        catFeatures = [self.relu(self.convs["squeeze"](feature)) for feature in lastFeatures]
+        catFeatures = torch.cat(catFeatures, 1)
+        out = catFeatures
+        for i in range(3):
+            out = self.convs[("pose", i)](out)
+            if i != 2:
+                out = self.relu(out)
+        out = out.mean(3).mean(2)
+        out = 0.01 * out.view(-1, self.numFramesPredict, 1, 6)
+        axisangle = out[..., :3]
+        translation = out[..., 3:]
+        return axisangle, translation

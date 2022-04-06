@@ -7,15 +7,14 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
-from Models.EncoderModel import EncoderModel
-from Models.DecoderModel import DecoderModel
-from Models.PoseCNN import PoseCNN
+from Models.EncoderModel import EncoderModel, MultiImageEncoderModel
+from Models.DecoderModel import DepthDecoderModel, PoseDecoderModel
 from Models.BackprojectDepth import BackprojectDepth
 from Models.Project3D import Project3D
 from Dataset.KITTI import KITTI
 
 class Trainer:
-    def __init__(self, LR=0.001, batchSize=64, epochs=100, height=192, width=640, frameIdxs=[0, -1, 1],
+    def __init__(self, LR=0.001, batchSize=48, epochs=20, height=192, width=640, frameIdxs=[0, -1, 1],
                  scales=[0, 1, 2, 3]):
         self.LR = LR
         self.batchSize = batchSize
@@ -30,10 +29,13 @@ class Trainer:
         self.models["encoder"] = EncoderModel(50)
         self.models["encoder"] = self.models["encoder"].to(self.device)
         self.trainableParameters += list(self.models["encoder"].parameters())
-        self.models["decoder"] = DecoderModel(self.models["encoder"].numChannels)
+        self.models["decoder"] = DepthDecoderModel(self.models["encoder"].numChannels)
         self.models["decoder"] = self.models["decoder"].to(self.device)
         self.trainableParameters += list(self.models["decoder"].parameters())
-        self.models["pose"] = PoseCNN(len(self.frameIdxs))
+        self.models["pose_encoder"] = MultiImageEncoderModel(50)
+        self.models["pose_encoder"] = self.models["pose_encoder"].to(self.device)
+        self.trainableParameters += list(self.models["pose_encoder"].parameters())
+        self.models["pose"] = PoseDecoderModel(self.models["pose_encoder"].numChannels)
         self.models["pose"] = self.models["pose"].to(self.device)
         self.trainableParameters += list(self.models["pose"].parameters())
         self.optimizer = optim.Adam(self.trainableParameters, lr=self.LR)
@@ -156,13 +158,17 @@ class Trainer:
 
     def predictPoses(self, inputs, features):
         outputs = {}
-        poseInputs = torch.cat([inputs[("color_aug", fi, 0)] for fi in self.frameIdxs if fi != "s"], 1)
-        axisangle, translation = self.models["pose"](poseInputs)
-        for i, fi in enumerate(self.frameIdxs[1:]):
-            if fi != "s":
-                outputs[("axisangle", 0, fi)] = axisangle
-                outputs[("translation", 0, fi)] = translation
-                outputs[("cam_T_cam", 0, fi)] = self.transformParameters(axisangle[:, i], translation[:, i])
+        poseFeatures = {fi: inputs["color_aug", fi, 0] for fi in self.frameIdxs}
+        for fi in self.frameIdxs[1:]:
+            if fi < 0:
+                poseInputs = [poseFeatures[fi], poseFeatures[0]]
+            else:
+                poseInputs = [poseFeatures[0], poseFeatures[fi]]
+            poseInputs = [self.models["pose_encoder"](torch.cat(poseInputs, 1))]
+            axisangle, translation = self.models["pose"](poseInputs)
+            outputs[("axisangle", 0, fi)] = axisangle
+            outputs[("translation", 0, fi)] = translation
+            outputs[("cam_T_cam", 0, fi)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
         return outputs
 
     def generateImagePredictions(self, inputs, outputs):
