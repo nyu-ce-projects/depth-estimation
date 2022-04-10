@@ -8,6 +8,14 @@ def pilLoader(imagePath):
         image = pil.open(f)
         image = image.convert('RGB')
         return image
+    
+def secondsToHM(durationSecs):
+    t = int(durationSecs)
+    s = t % 60
+    t //= 60
+    m = t % 60
+    t //= 60
+    return "{:02d}h{:02d}m{:02d}s".format(t, m, s)
 
 def readCalibrationFile(calibrationFilePath):
     floatChars = set("0123456789.e+- ")

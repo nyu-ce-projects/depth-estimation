@@ -10,13 +10,13 @@ class BackprojectDepth(nn.Module):
         self.height = height
         self.width = width
         meshgrid = np.meshgrid(range(self.width), range(self.height), indexing='xy')
-        idCoordinates = np.stack(meshgrid, axis=0).astype(np.float32)
-        idCoordinates = nn.Parameter(torch.from_numpy(idCoordinates), requires_grad=False)
+        self.idCoordinates = np.stack(meshgrid, axis=0).astype(np.float32)
+        self.idCoordinates = nn.Parameter(torch.from_numpy(self.idCoordinates), requires_grad=False)
         self.ones = nn.Parameter(torch.ones(self.batchSize, 1, self.height*self.width),
                                  requires_grad=False)
-        self.pixelCoordinates = torch.unsqueeze(torch.stack([idCoordinates[0].view(-1),
-                                                             idCoordinates[1].view(-1)], 0), 0)
-        self.pixelCoordinates = self.pixelCoordinates.repeat(batchSize, 1, 1)
+        self.pixelCoordinates = torch.unsqueeze(torch.stack([self.idCoordinates[0].view(-1),
+                                                             self.idCoordinates[1].view(-1)], 0), 0)
+        self.pixelCoordinates = self.pixelCoordinates.repeat(self.batchSize, 1, 1)
         self.pixelCoordinates = nn.Parameter(torch.cat([self.pixelCoordinates, self.ones], 1),
                                              requires_grad=False)
 

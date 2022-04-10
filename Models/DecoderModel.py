@@ -9,7 +9,7 @@ class ConvBlock(nn.Module):
         super(ConvBlock, self).__init__()
         self.activation = activation
         self.pad = nn.ReflectionPad2d(1)
-        self.conv = nn.Conv2d(inChannels, outChannels, kernel_size=3)
+        self.conv = nn.Conv2d(int(inChannels), int(outChannels), kernel_size=3)
         self.act = nn.ELU()
 
     def forward(self, x):
@@ -57,8 +57,8 @@ class PoseDecoderModel(nn.Module):
     def __init__(self, numChannelsEncoder):
         super(PoseDecoderModel, self).__init__()
         self.numChannelsEncoder = numChannelsEncoder
-        self.numFeaturesInput = 1
-        self.numFramesPredict = 2
+        self.numFeaturesInput = 2
+        self.numFramesPredict = 1
         self.convs = OrderedDict()
         self.convs[("squeeze")] = nn.Conv2d(self.numChannelsEncoder[-1], 256, 1)
         self.convs[("pose", 0)] = nn.Conv2d(self.numFeaturesInput*256, 256, 3, 1, 1)
