@@ -20,10 +20,11 @@ class ConvBlock(nn.Module):
         return out
 
 class DepthDecoderModel(nn.Module):
-    def __init__(self, numChannelsEncoder):
+    def __init__(self, numChannelsEncoder, encoderType="resnet"):
         super(DepthDecoderModel, self).__init__()
         self.numChannelsEncoder = numChannelsEncoder
         self.numChannelsDecoder = np.array([16, 32, 64, 128, 256])
+        self.encoderType = encoderType
         self.convs = OrderedDict()
         for layer in range(4, -1, -1):
             inChannels = self.numChannelsEncoder[-1] if layer == 4 else self.numChannelsDecoder[layer+1]
@@ -43,7 +44,13 @@ class DepthDecoderModel(nn.Module):
         x = inputFeatures[-1]
         for layer in range(4, -1, -1):
             x = self.convs[("upconv", layer, 0)](x)
-            x = [nn.functional.interpolate(x, scale_factor=2, mode="nearest")]
+            sf = 2
+            #if self.encoderType == "convnext":
+            #    if layer == 0:
+            #        sf = 4
+            #    elif layer == 1:
+            #        sf = 1
+            x = [nn.functional.interpolate(x, scale_factor=sf, mode="nearest")]
             if layer > 0:
                 x += [inputFeatures[layer-1]]
             x = torch.cat(x, dim=1)
@@ -54,7 +61,7 @@ class DepthDecoderModel(nn.Module):
         return self.outputs
 
 class PoseDecoderModel(nn.Module):
-    def __init__(self, numChannelsEncoder):
+    def __init__(self, numChannelsEncoder, encoderType="resnet"):
         super(PoseDecoderModel, self).__init__()
         self.numChannelsEncoder = numChannelsEncoder
         self.numFeaturesInput = 2
