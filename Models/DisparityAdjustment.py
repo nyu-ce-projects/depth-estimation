@@ -1,13 +1,17 @@
+import torch
+import torchvision
+
+
 netMaskrcnn = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True).cuda().eval()
 
-def disparity_adjustment(tenImage, tenDisparity):
-	assert(tenImage.shape[0] == 1)
-	assert(tenDisparity.shape[0] == 1)
+def disparity_adjustment(orig_image, disparity_map):
+	assert(orig_image.shape[0] == 1)
+	assert(disparity_map.shape[0] == 1)
 
 	boolUsed = {}
 	tenMasks = []
 
-	objPredictions = netMaskrcnn([ tenImage[ 0, [ 2, 0, 1 ], :, : ] ])[0]
+	objPredictions = netMaskrcnn([ orig_image[ 0, [ 2, 0, 1 ], :, : ] ])[0]
 
 	for intMask in range(objPredictions['masks'].shape[0]):
 		if intMask in boolUsed:
@@ -53,7 +57,7 @@ def disparity_adjustment(tenImage, tenDisparity):
 		tenMasks.append(tenMask)
 	# end
 
-	tenAdjusted = torch.nn.functional.interpolate(input=tenDisparity, size=(tenImage.shape[2], tenImage.shape[3]), mode='bilinear', align_corners=False)
+	tenAdjusted = torch.nn.functional.interpolate(input=disparity_map, size=(orig_image.shape[2], orig_image.shape[3]), mode='bilinear', align_corners=False)
 
 	for tenAdjust in tenMasks:
 		tenPlane = tenAdjusted * tenAdjust
@@ -71,5 +75,5 @@ def disparity_adjustment(tenImage, tenDisparity):
 		tenAdjusted = ((1.0 - tenAdjust) * tenAdjusted) + (tenAdjust * tenPlane[:, :, int(round(intTop + (0.97 * (intBottom - intTop)))):, :].max())
 	# end
 
-	return torch.nn.functional.interpolate(input=tenAdjusted, size=(tenDisparity.shape[2], tenDisparity.shape[3]), mode='bilinear', align_corners=False)
+	return torch.nn.functional.interpolate(input=tenAdjusted, size=(disparity_map.shape[2], disparity_map.shape[3]), mode='bilinear', align_corners=False)
 # end
