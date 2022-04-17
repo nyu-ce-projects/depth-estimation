@@ -14,6 +14,7 @@ from Models.EncoderModel import EncoderModel, MultiImageEncoderModel
 from Models.DecoderModel import DepthDecoderModel, PoseDecoderModel
 from Models.BackprojectDepth import BackprojectDepth
 from Models.Project3D import Project3D
+from Models.DisparityAdjustment import disparity_adjustment
 
 from Losses.SSIM import SSIM
 
@@ -216,6 +217,11 @@ class Trainer:
             disp = outputs[("disp", scale)]
             disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",
                                  align_corners=False)
+            
+            # Disparity Adjustment
+            orig_image = inputs[("color", 0, 0)]
+            disp = disparity_adjustment(orig_image,disp)
+
             sourceScale = 0
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
             outputs[("depth", 0, scale)] = depth
@@ -302,6 +308,10 @@ class Trainer:
                 toOptimise, idxs = torch.min(combined, dim=1)
             outputs["identity_selection/{}".format(scale)] = (idxs > identityReprojectionLoss.shape[1] - 1).float()
             loss += toOptimise.mean()
+
+            # Disparity Map Adjustment
+            disp = disparity_adjustment(color,disp)
+
             meanDisp = disp.mean(2, True).mean(3, True)
             normDisp = disp / (meanDisp + 1e-7)
             smoothLoss = self.getSmoothLoss(normDisp, color)
