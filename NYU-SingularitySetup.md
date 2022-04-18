@@ -40,7 +40,7 @@ vi python
 Adding
 ```
 singularity exec $nv \
-  --overlay /scratch/$USER/mondep/overlay-10GB-400K.ext3:rw \
+  --overlay /scratch/$USER/mondep/overlay-10GB-400K.ext3:ro \
   /scratch/work/public/singularity/cuda11.2.2-cudnn8-devel-ubuntu20.04.sif \
   /bin/bash -c "source /ext3/env.sh; $cmd $args"
 ```
@@ -50,13 +50,13 @@ Edit the default kernel.json file by setting PYTHON_LOCATION and KERNEL_DISPLAY_
 ```
 {
  "argv": [
-  "/home/am11533/.local/share/jupyter/kernels/monodepth3_env/python",
+  "/home/am11533/.local/share/jupyter/kernels/mondep_env/python",
   "-m",
   "ipykernel_launcher",
   "-f",
   "{connection_file}"
  ],
- "display_name": "monodepth3_env",
+ "display_name": "mondep_env",
  "language": "python"
 }
 ```
