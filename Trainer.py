@@ -8,9 +8,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from utils import secondsToHM
-from dotenv import load_dotenv
 
-from Models.EncoderModel import EncoderModel, MultiImageEncoderModel
+from Models.EncoderModel import EncoderModel
 from Models.DecoderModel import DepthDecoderModel, PoseDecoderModel
 from Models.BackprojectDepth import BackprojectDepth
 from Models.Project3D import Project3D
@@ -68,7 +67,7 @@ class Trainer:
             self.project3d[scale] = self.project3d[scale].to(self.device)
         self.writers = {}
         for mode in ["train", "val"]:
-            self.writers[mode] = SummaryWriter(os.path.join("/scratch/{}/Monodepth2/logs".format(os.environ['LOGNAME']), mode))
+            self.writers[mode] = SummaryWriter(os.path.join(os.environ['GLOBAL_BASE_LOG_DIR'], mode))
 
     def readlines(self, path):
         with open(path, "r") as f:
@@ -77,7 +76,7 @@ class Trainer:
 
     def loadDataset(self):
         self.dataset = KITTI
-        dataPath = os.path.join("/scratch/mp6021/Monodepth2", "data", "KITTI")
+        dataPath = os.environ['GLOBAL_DATAPATH']
         filepath = os.path.join(dataPath, "splits", "eigen_zhou", "{}_files.txt")
         trainFilenames = self.readlines(filepath.format("train"))
         valFilenames = self.readlines(filepath.format("val"))
@@ -118,7 +117,7 @@ class Trainer:
         print(logString.format(self.epoch, batchIdx, samplesPerSec, loss, secondsToHM(totalTime), secondsToHM(timeLeft)))
 
     def saveModel(self):
-        outpath = os.path.join("/scratch/mp6021/Monodepth2", "models", "weights_{}".format(self.epoch))
+        outpath = os.path.join(os.environ['MODEL_PATH'], "weights_{}".format(self.epoch))
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         for name, model in self.models.items():

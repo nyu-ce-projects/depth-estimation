@@ -6,12 +6,11 @@ channels:
 dependencies:
   - python=3.8
   - pip
-  - pytorch
-  - torchvision
-  - torchaudio
-  - cudatoolkit=11.3
   - pip:
+    - torch
+    - torchvision
+    - torchaudio
     - python-dotenv
-    - tensorboardx
+    - tensorboardX
     - scikit-image
 

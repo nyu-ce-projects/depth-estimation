@@ -2,6 +2,23 @@ import os
 import numpy as np
 import PIL.Image as pil
 from collections import Counter
+import configparser
+import argparse
+
+
+
+def load_config(config_path):
+    # loading .cfg config file from global scope
+    configDict = {}
+    config = configparser.ConfigParser()
+    config.read(config_path)
+    for key in config:
+        for nkey in config[key]:
+            new_key = (key+"_"+nkey).lower()
+            configDict[new_key] = config[key][nkey] 
+    os.environ.update(configDict)
+    return configDict
+
 
 def pilLoader(imagePath):
     with open(imagePath, 'rb') as f:
