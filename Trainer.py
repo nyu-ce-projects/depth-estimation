@@ -53,7 +53,7 @@ class Trainer:
         self.ssim = SSIM()
         self.ssim = self.ssim.to(self.device)
         self.optimizer = optim.Adam(self.trainableParameters, lr=self.LR)
-        self.lrScheduler = optim.lr_scheduler.StepLR(self.optimizer, 15, 0.1)
+        self.lrScheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,'min')#optim.lr_scheduler.StepLR(self.optimizer, 15, 0.1)
         self.loadDataset()
         self.depthMetricNames = ["de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
         self.backprojectDepth = {}
@@ -337,7 +337,6 @@ class Trainer:
         return outputs, losses
 
     def runEpoch(self):
-        self.lrScheduler.step()
         self.setTrain()
         for batchIdx, inputs in enumerate(self.trainLoader):
             startTime = time.time()
@@ -354,6 +353,7 @@ class Trainer:
                 self.log("train", inputs, outputs, losses)
                 self.val()
             self.step += 1
+        self.lrScheduler.step()
 
     def train(self):
         print("Total Trainable Parameters : {}".format(self.totalTrainableParams))
