@@ -18,7 +18,8 @@ class CustomDataset(data.Dataset):
         self.frameIdxs = frameIdxs
         self.numScales = numScales
         self.train = train
-        self.interpolation = pil.ANTIALIAS
+        #self.interpolation = pil.ANTIALIAS
+        self.interpolation = T.InterpolationMode.LANCZOS
         self.loader = pilLoader
         self.toTensor = T.ToTensor()
         self.brightness = (0.8, 1.2)
