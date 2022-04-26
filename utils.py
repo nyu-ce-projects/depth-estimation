@@ -14,8 +14,9 @@ def load_config(config_path):
     config.read(config_path)
     for key in config:
         for nkey in config[key]:
-            new_key = (key+"_"+nkey).lower()
+            new_key = (key+"_"+nkey).upper()
             configDict[new_key] = config[key][nkey] 
+    print(configDict)
     os.environ.update(configDict)
     return configDict
 
