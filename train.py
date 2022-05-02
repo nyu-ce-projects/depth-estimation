@@ -1,7 +1,7 @@
 
 import argparse
 
-from Trainer import Trainer
+from Trainers.Trainer import getTrainer
 
 from configs.config_loader import load_config
 
@@ -17,6 +17,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     config = load_config(config_path=args.conf_file,model_name=args.model)
-    net = Trainer(config)
+    net = getTrainer(config)
 
     net.train()
