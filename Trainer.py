@@ -13,7 +13,7 @@ from Models.EncoderModel import EncoderModel
 from Models.DecoderModel import DepthDecoderModel, PoseDecoderModel
 from Models.BackprojectDepth import BackprojectDepth
 from Models.Project3D import Project3D
-from Models.DisparityAdjustment import DisparityAdjustment
+from Models.DisparityAdjustmentV2 import DisparityAdjustment
 
 from Losses.SSIM import SSIM
 

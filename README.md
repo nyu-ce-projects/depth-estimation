@@ -13,3 +13,7 @@ conda activate mondep_env
 ```
 
 
+Training your model
+```
+python train.py --model MONODEPTH2 --conf configs/model_config.cfg 
+```
