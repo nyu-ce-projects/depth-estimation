@@ -48,11 +48,12 @@ class Trainer:
         #self.totalTrainableParams += sum(p.numel() for p in self.models["pose_encoder"].parameters() if p.requires_grad)
         self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels)
         self.models["pose"] = self.models["pose"].to(self.device)
+        self.disparityadjustment = DisparityAdjustment(self.device)
         self.trainableParameters += list(self.models["pose"].parameters())
         self.totalTrainableParams += sum(p.numel() for p in self.models["pose"].parameters() if p.requires_grad)
         self.ssim = SSIM()
         self.ssim = self.ssim.to(self.device)
-        self.optimizer = optim.Adam(self.trainableParameters, lr=self.LR)
+        self.optimizer = optim.AdamW(self.trainableParameters, lr=self.LR, betas=(0.9, 0.999), weight_decay=0.05)
         self.lrScheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,'min')#optim.lr_scheduler.StepLR(self.optimizer, 15, 0.1)
         self.loadDataset()
         self.depthMetricNames = ["de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
@@ -216,7 +217,7 @@ class Trainer:
 
             # Disparity Adjustment
             orig_scaled_images = inputs[("color", 0, scale)]
-            outputs[("disp", scale)] = DisparityAdjustment(orig_scaled_images,outputs[("disp", scale)])
+            outputs[("disp", scale)] = self.disparityadjustment(orig_scaled_images,outputs[("disp", scale)])
 
             disp = outputs[("disp", scale)]
             
