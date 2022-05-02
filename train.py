@@ -16,7 +16,7 @@ if __name__ == "__main__":
         help="model name"
     )
     args = parser.parse_args()
-    conf = load_config(config_path=args.conf_file,model_name=args.model)
-    net = Trainer()
+    config = load_config(config_path=args.conf_file,model_name=args.model)
+    net = Trainer(config)
 
     net.train()

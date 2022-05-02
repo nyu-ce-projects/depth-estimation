@@ -20,37 +20,43 @@ from Losses.SSIM import SSIM
 from Dataset.KITTI import KITTI
 
 class Trainer:
-    def __init__(self, LR=0.0001, batchSize=24, epochs=20, height=192, width=640, frameIdxs=[0, -1, 1],
-                 scales=[0, 1, 2, 3]):
-        self.LR = LR
-        self.batchSize = batchSize
-        self.epochs = epochs
-        self.height = height
-        self.width = width
-        self.frameIdxs = frameIdxs
-        self.numScales = len(scales)
+    def __init__(self,config):
+        self.LR = config['LR']
+        self.batchSize = config['BATCHSIZE']
+        self.epochs = config['EPOCHS']
+        self.height = config['HEIGHT']
+        self.width = config['WIDTH']
+        self.frameIdxs = config['FRAME_IDS']
+        self.numScales = config['NUMSCALES']
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
+
         self.models = {}
         self.totalTrainableParams = 0
         self.trainableParameters = []
+
+        # Depth Estimation Model Initialization
         self.models["encoder"] = EncoderModel(50)
         self.models["encoder"] = self.models["encoder"].to(self.device)
         self.trainableParameters += list(self.models["encoder"].parameters())
         self.totalTrainableParams += sum(p.numel() for p in self.models["encoder"].parameters() if p.requires_grad)
+        
         self.models["decoder"] = DepthDecoderModel(self.models["encoder"].numChannels)
         self.models["decoder"] = self.models["decoder"].to(self.device)
         self.trainableParameters += list(self.models["decoder"].parameters())
         self.totalTrainableParams += sum(p.numel() for p in self.models["decoder"].parameters() if p.requires_grad)
-        #self.models["pose_encoder"] = MultiImageEncoderModel(50)
-        #self.models["pose_encoder"] = self.models["pose_encoder"].to(self.device)
-        #self.trainableParameters += list(self.models["pose_encoder"].parameters())
-        #self.totalTrainableParams += sum(p.numel() for p in self.models["pose_encoder"].parameters() if p.requires_grad)
+        
+        # Pose Estimation Model Initialization
         self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels)
         self.models["pose"] = self.models["pose"].to(self.device)
-        self.disparityadjustment = DisparityAdjustment(self.device)
         self.trainableParameters += list(self.models["pose"].parameters())
         self.totalTrainableParams += sum(p.numel() for p in self.models["pose"].parameters() if p.requires_grad)
+        
+        #Disparity Adjustment Model
+        self.disparityadjustment = DisparityAdjustment(self.device)
+        
+        
         self.ssim = SSIM()
         self.ssim = self.ssim.to(self.device)
         self.optimizer = optim.AdamW(self.trainableParameters, lr=self.LR, betas=(0.9, 0.999), weight_decay=0.05)
