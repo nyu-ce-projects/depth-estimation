@@ -19,6 +19,7 @@ def load_config(config_path,model_name):
     #         new_key = (key+"_"+nkey).upper()
     #         configDict[new_key] = config[key][nkey] 
     configDict =  {**config['GLOBAL'],**config[model_name.upper()]}
+    configDict['MODEL_NAME'] = model_name.upper()
     print(configDict)
     os.environ.update(configDict)
     return configDict
