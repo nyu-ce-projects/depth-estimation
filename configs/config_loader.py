@@ -15,7 +15,7 @@ def load_config(config_path,model_name):
     #         configDict[new_key] = config[key][nkey] 
     configDict =  {**config['GLOBAL'],**config[model_name.upper()]}
     configDict['model_name'] = model_name
-    configDict['frame_ids'] = configDict['frame_ids'].split(",")
+    configDict['frame_ids'] = list(map(int, configDict['frame_ids'].split(",")))
     print(configDict)
     # os.environ.update(configDict)
     return configDict

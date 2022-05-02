@@ -1,4 +1,4 @@
-name: mondep-env
+name: depthestimate-env
 channels:
   - pytorch
   - conda-forge

@@ -8,9 +8,10 @@
 
 ### Using Conda 
 ```
-conda env create -f mondep_env.yaml
-conda activate mondep_env
+conda env create -f depthestimate_env.yaml
+conda activate depthestimate_env
 ```
+for mac m1 use depthestimate_env_mac_cpu.yaml
 
 
 Training your model
