@@ -18,3 +18,9 @@ Training your model
 ```
 python train.py --model MONODEPTH2 --conf configs/model_config.cfg 
 ```
+
+To run in background
+
+```
+nohup python train.py --model MONODEPTH2 > output.log &
+```

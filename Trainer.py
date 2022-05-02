@@ -29,7 +29,6 @@ class Trainer:
         self.width = int(config['width'])
         self.frameIdxs = config['frame_ids']
         self.numScales = int(config['numscales'])
-        print("ak",type(self.frameIdxs))
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
 
@@ -49,7 +48,7 @@ class Trainer:
         self.totalTrainableParams += sum(p.numel() for p in self.models["decoder"].parameters() if p.requires_grad)
         
         # Pose Estimation Model Initialization
-        self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels)
+        self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels, 2, 1)
         self.models["pose"] = self.models["pose"].to(self.device)
         self.trainableParameters += list(self.models["pose"].parameters())
         self.totalTrainableParams += sum(p.numel() for p in self.models["pose"].parameters() if p.requires_grad)
