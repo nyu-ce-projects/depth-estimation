@@ -1,45 +1,68 @@
 import os
 import numpy as np
+import time
 
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+from utils import secondsToHM
 
-from Models.EncoderModel import EncoderModel, MultiImageEncoderModel
+from Models.EncoderModel import EncoderModel
 from Models.DecoderModel import DepthDecoderModel, PoseDecoderModel
 from Models.BackprojectDepth import BackprojectDepth
 from Models.Project3D import Project3D
+from Models.DisparityAdjustmentV2 import DisparityAdjustment
+
+from Losses.SSIM import SSIM
+
 from Dataset.KITTI import KITTI
 
 class Trainer:
-    def __init__(self, LR=0.001, batchSize=48, epochs=20, height=192, width=640, frameIdxs=[0, -1, 1],
-                 scales=[0, 1, 2, 3]):
-        self.LR = LR
-        self.batchSize = batchSize
-        self.epochs = epochs
-        self.height = height
-        self.width = width
-        self.frameIdxs = frameIdxs
-        self.numScales = len(scales)
+    def __init__(self,config):
+        self.config = config
+        self.config['lr'] = float(config['lr'])
+        self.batchSize = int(config['batchsize'])
+        self.epochs = int(config['epochs'])
+        self.height = int(config['height'])
+        self.width = int(config['width'])
+        self.frameIdxs = config['frame_ids']
+        self.numScales = int(config['numscales'])
+        print("ak",type(self.frameIdxs))
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(self.device)
+
         self.models = {}
+        self.totalTrainableParams = 0
         self.trainableParameters = []
+
+        # Depth Estimation Model Initialization
         self.models["encoder"] = EncoderModel(50)
         self.models["encoder"] = self.models["encoder"].to(self.device)
         self.trainableParameters += list(self.models["encoder"].parameters())
+        self.totalTrainableParams += sum(p.numel() for p in self.models["encoder"].parameters() if p.requires_grad)
+        
         self.models["decoder"] = DepthDecoderModel(self.models["encoder"].numChannels)
         self.models["decoder"] = self.models["decoder"].to(self.device)
         self.trainableParameters += list(self.models["decoder"].parameters())
-        self.models["pose_encoder"] = MultiImageEncoderModel(50)
-        self.models["pose_encoder"] = self.models["pose_encoder"].to(self.device)
-        self.trainableParameters += list(self.models["pose_encoder"].parameters())
-        self.models["pose"] = PoseDecoderModel(self.models["pose_encoder"].numChannels)
+        self.totalTrainableParams += sum(p.numel() for p in self.models["decoder"].parameters() if p.requires_grad)
+        
+        # Pose Estimation Model Initialization
+        self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels)
         self.models["pose"] = self.models["pose"].to(self.device)
         self.trainableParameters += list(self.models["pose"].parameters())
-        self.optimizer = optim.Adam(self.trainableParameters, lr=self.LR)
-        self.lrScheduler = optim.lr_scheduler.StepLR(self.optimizer, 15, 0.1)
+        self.totalTrainableParams += sum(p.numel() for p in self.models["pose"].parameters() if p.requires_grad)
+        
+        #Disparity Adjustment Model
+        self.disparityadjustment = DisparityAdjustment(self.device)
+        
+        # Loss, Metrics and Optimizer Init
+        self.ssim = SSIM()
+        self.ssim = self.ssim.to(self.device)
+        print(self.config['lr'])
+        self.optimizer = eval("optim."+self.config['optimizer'])(self.trainableParameters, lr=self.config['lr'], weight_decay=float(self.config['optim_weight_decay']))
+        self.lrScheduler = eval("optim.lr_scheduler."+self.config['lr_scheduler'])(self.optimizer, int(self.config['lr_scheduler_steps']), float(self.config['lr_scheduler_decay']))
         self.loadDataset()
         self.depthMetricNames = ["de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
         self.backprojectDepth = {}
@@ -51,6 +74,9 @@ class Trainer:
             self.backprojectDepth[scale] = self.backprojectDepth[scale].to(self.device)
             self.project3d[scale] = Project3D(self.batchSize, h, w)
             self.project3d[scale] = self.project3d[scale].to(self.device)
+        self.writers = {}
+        for mode in ["train", "val"]:
+            self.writers[mode] = SummaryWriter(os.path.join(self.config['base_log_dir'],self.config['model_name'], mode))
 
     def readlines(self, path):
         with open(path, "r") as f:
@@ -59,18 +85,18 @@ class Trainer:
 
     def loadDataset(self):
         self.dataset = KITTI
-        dataPath = os.path.join(os.path.dirname(__file__), "data", "KITTI")
+        dataPath = self.config['datapath']
         filepath = os.path.join(dataPath, "splits", "eigen_zhou", "{}_files.txt")
         trainFilenames = self.readlines(filepath.format("train"))
         valFilenames = self.readlines(filepath.format("val"))
         numTrain = len(trainFilenames)
-        self.numSteps = numTrain//(self.batchSize*self.epochs)
+        self.numSteps = (numTrain//self.batchSize)*self.epochs
         trainDataset = self.dataset(dataPath, trainFilenames, self.height, self.width,
                                     self.frameIdxs, 4, True)
         valDataset = self.dataset(dataPath, valFilenames, self.height, self.width, self.frameIdxs,
                                   4, False)
         self.trainLoader = DataLoader(trainDataset, self.batchSize, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
-        self.valLoader = DataLoader(valDataset, self.batchSize, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+        self.valLoader = DataLoader(valDataset, self.batchSize, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
         self.valIterator = iter(self.valLoader)
 
     def setTrain(self):
@@ -80,9 +106,27 @@ class Trainer:
     def setEval(self):
         for model in self.models.values():
             model.eval()
+            
+    def log(self, mode, inputs, outputs, losses):
+        writer = self.writers[mode]
+        for lossname, value in losses.items():
+            writer.add_scalar("{}".format(lossname), value, self.step)
+        for i in range(4):
+            for frameIdx in self.frameIdxs:
+                writer.add_image("color_{}/{}".format(frameIdx, i), inputs[("color", frameIdx, 0)][i].data, self.step)
+                if frameIdx != 0:
+                    writer.add_image("color_pred_{}/{}".format(frameIdx, i), outputs[("color", frameIdx, 0)][i].data, self.step)
+                writer.add_image("disp/{}".format(i), self.normalizeImage(outputs[("disp", 0)][i]), self.step)
+    
+    def logTime(self, batchIdx, duration, loss):
+        samplesPerSec = self.batchSize / duration
+        totalTime = time.time() - self.startTime
+        timeLeft = (self.numSteps / self.step - 1.0)*totalTime if self.step > 0 else 0
+        logString = "Epoch : {:>3} | Batch : {:>7}, examples/s: {:5.1f}, loss : {:.5f}, time elapsed: {}, time left: {}"
+        print(logString.format(self.epoch, batchIdx, samplesPerSec, loss, secondsToHM(totalTime), secondsToHM(timeLeft)))
 
     def saveModel(self):
-        outpath = os.path.join(os.path.dirname(__file__), "models", "weights_{}".format(self.epoch))
+        outpath = os.path.join(self.config['model_path'],self.config['model_name'], "weights_{}".format(self.epoch))
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         for name, model in self.models.items():
@@ -94,6 +138,12 @@ class Trainer:
             torch.save(toSave, savePath)
         savePath = os.path.join(outpath, "adam.pth")
         torch.save(self.optimizer.state_dict(), savePath)
+        
+    def normalizeImage(self, image):
+        maxValue = float(image.max().cpu().data)
+        minValue = float(image.min().cpu().data)
+        diff = (maxValue - minValue) if maxValue != minValue else 1e5
+        return (image - minValue)/diff
 
     def dispToDepth(self, disp, minDepth, maxDepth):
         minDisp = 1 / maxDepth
@@ -158,13 +208,12 @@ class Trainer:
 
     def predictPoses(self, inputs, features):
         outputs = {}
-        poseFeatures = {fi: inputs["color_aug", fi, 0] for fi in self.frameIdxs}
+        poseFeatures = {fi: features[fi] for fi in self.frameIdxs}
         for fi in self.frameIdxs[1:]:
             if fi < 0:
                 poseInputs = [poseFeatures[fi], poseFeatures[0]]
             else:
                 poseInputs = [poseFeatures[0], poseFeatures[fi]]
-            poseInputs = [self.models["pose_encoder"](torch.cat(poseInputs, 1))]
             axisangle, translation = self.models["pose"](poseInputs)
             outputs[("axisangle", 0, fi)] = axisangle
             outputs[("translation", 0, fi)] = translation
@@ -173,9 +222,16 @@ class Trainer:
 
     def generateImagePredictions(self, inputs, outputs):
         for scale in range(self.numScales):
+
+            # Disparity Adjustment
+            orig_scaled_images = inputs[("color", 0, scale)]
+            outputs[("disp", scale)] = self.disparityadjustment(orig_scaled_images,outputs[("disp", scale)])
+
             disp = outputs[("disp", scale)]
+            
             disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",
                                  align_corners=False)
+
             sourceScale = 0
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
             outputs[("depth", 0, scale)] = depth
@@ -187,6 +243,7 @@ class Trainer:
                 outputs[("color", frameIdx, scale)] = F.grid_sample(inputs[("color", frameIdx, sourceScale)],
                                                                     outputs[(("sample", frameIdx, scale))],
                                                                     padding_mode="border")
+                outputs[("color_identity", frameIdx, scale)] = inputs[("color", frameIdx, sourceScale)]
 
     def computeDepthErrors(self, depthGroundTruth, depthPred):
         threshold = torch.max((depthGroundTruth/depthPred), (depthPred/depthGroundTruth))
@@ -220,9 +277,10 @@ class Trainer:
             losses[name] = np.array(depthErrors[i].cpu())
 
     def computeReprojectionLoss(self, pred, target):
-        absDiff = torch.abs(pred - target)
+        absDiff = torch.abs(target - pred)
         l1Loss = absDiff.mean(1, True)
-        return l1Loss
+        ssim_loss = self.ssim(pred, target).mean(1, True)
+        return 0.85*ssim_loss + 0.15*l1Loss
 
     def getSmoothLoss(self, disp, img):
         gradientDispX = torch.abs(disp[:, :, :, :-1] - disp[:, :, :, 1:])
@@ -247,12 +305,20 @@ class Trainer:
                 pred = outputs[("color", frameIdx, scale)]
                 reprojectionLoss.append(self.computeReprojectionLoss(pred, target))
             reprojectionLoss = torch.cat(reprojectionLoss, 1)
-            combined = reprojectionLoss
+            identityReprojectionLoss = []
+            for frameIdx in self.frameIdxs[1:]:
+                pred = inputs[("color", frameIdx, sourceScale)]
+                identityReprojectionLoss.append(self.computeReprojectionLoss(pred, target))
+            identityReprojectionLoss = torch.cat(identityReprojectionLoss, 1)
+            identityReprojectionLoss += torch.randn(identityReprojectionLoss.shape, device=self.device) * 0.00001
+            combined = torch.cat((identityReprojectionLoss, reprojectionLoss), 1)
             if combined.shape[1] == 1:
                 toOptimise = combined
             else:
                 toOptimise, idxs = torch.min(combined, dim=1)
+            outputs["identity_selection/{}".format(scale)] = (idxs > identityReprojectionLoss.shape[1] - 1).float()
             loss += toOptimise.mean()
+
             meanDisp = disp.mean(2, True).mean(3, True)
             normDisp = disp / (meanDisp + 1e-7)
             smoothLoss = self.getSmoothLoss(normDisp, color)
@@ -266,32 +332,47 @@ class Trainer:
     def processBatch(self, inputs):
         for key, value in inputs.items():
             inputs[key] = value.to(self.device)
-        features = self.models["encoder"](inputs["color_aug", 0, 0])
-        outputs = self.models["decoder"](features)
+        origScaleColorAug = torch.cat([inputs[("color_aug", fi, 0)] for fi in self.frameIdxs])
+        allFrameFeatures = self.models["encoder"](origScaleColorAug)
+        allFrameFeatures = [torch.split(f, self.batchSize) for f in allFrameFeatures]
+        features = {}
+        for i, frameIdx in enumerate(self.frameIdxs):
+            features[frameIdx] = [f[i] for f in allFrameFeatures]
+        outputs = self.models["decoder"](features[0])
         outputs.update(self.predictPoses(inputs, features))
         self.generateImagePredictions(inputs, outputs)
         losses = self.computeLosses(inputs, outputs)
         return outputs, losses
 
     def runEpoch(self):
-        self.lrScheduler.step()
         self.setTrain()
         for batchIdx, inputs in enumerate(self.trainLoader):
-            print("Epoch : {}, Batch : {}".format(self.epoch, batchIdx))
+            startTime = time.time()
             outputs, losses = self.processBatch(inputs)
             self.optimizer.zero_grad()
             losses["loss"].backward()
             self.optimizer.step()
-            self.computeDepthLosses(inputs, outputs, losses)
-            self.val()
+            duration = time.time() - startTime
+            early_phase = batchIdx % 200 == 0 and self.step < 2000
+            late_phase = self.step % 1000 == 0
+            if early_phase or late_phase:
+                self.logTime(batchIdx, duration, losses["loss"].cpu().data)
+                self.computeDepthLosses(inputs, outputs, losses)
+                self.log("train", inputs, outputs, losses)
+                self.val()
+            self.step += 1
+        self.lrScheduler.step()
 
     def train(self):
+        print("Total Trainable Parameters : {}".format(self.totalTrainableParams))
+        print("Total Steps : {}".format(self.numSteps))
         self.epoch = 0
+        self.step = 0
+        self.startTime = time.time()
         for self.epoch in range(self.epochs):
             print("Training --- Epoch : {}".format(self.epoch))
             self.runEpoch()
-            if self.epoch % 5 == 0:
-                self.saveModel()
+            self.saveModel()
 
     def val(self):
         self.setEval()
@@ -303,6 +384,7 @@ class Trainer:
         with torch.no_grad():
             outputs, losses = self.processBatch(inputs)
             self.computeDepthLosses(inputs, outputs, losses)
+            self.log("val", inputs, outputs, losses)
             del inputs, outputs, losses
         self.setTrain()
 
