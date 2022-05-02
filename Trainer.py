@@ -21,14 +21,15 @@ from Dataset.KITTI import KITTI
 
 class Trainer:
     def __init__(self,config):
-        self.LR = config['LR']
-        self.batchSize = config['BATCHSIZE']
-        self.epochs = config['EPOCHS']
-        self.height = config['HEIGHT']
-        self.width = config['WIDTH']
-        self.frameIdxs = config['FRAME_IDS']
-        self.numScales = config['NUMSCALES']
-
+        self.config = config
+        self.config['lr'] = float(config['lr'])
+        self.batchSize = int(config['batchsize'])
+        self.epochs = int(config['epochs'])
+        self.height = int(config['height'])
+        self.width = int(config['width'])
+        self.frameIdxs = config['frame_ids']
+        self.numScales = int(config['numscales'])
+        print("ak",type(self.frameIdxs))
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
 
@@ -56,11 +57,12 @@ class Trainer:
         #Disparity Adjustment Model
         self.disparityadjustment = DisparityAdjustment(self.device)
         
-        
+        # Loss, Metrics and Optimizer Init
         self.ssim = SSIM()
         self.ssim = self.ssim.to(self.device)
-        self.optimizer = optim.AdamW(self.trainableParameters, lr=self.LR, betas=(0.9, 0.999), weight_decay=0.05)
-        self.lrScheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,'min')#optim.lr_scheduler.StepLR(self.optimizer, 15, 0.1)
+        print(self.config['lr'])
+        self.optimizer = eval("optim."+self.config['optimizer'])(self.trainableParameters, lr=self.config['lr'], weight_decay=float(self.config['optim_weight_decay']))
+        self.lrScheduler = eval("optim.lr_scheduler."+self.config['lr_scheduler'])(self.optimizer, int(self.config['lr_scheduler_steps']), float(self.config['lr_scheduler_decay']))
         self.loadDataset()
         self.depthMetricNames = ["de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
         self.backprojectDepth = {}
@@ -74,7 +76,7 @@ class Trainer:
             self.project3d[scale] = self.project3d[scale].to(self.device)
         self.writers = {}
         for mode in ["train", "val"]:
-            self.writers[mode] = SummaryWriter(os.path.join(os.environ['BASE_LOG_DIR'],os.environ['MODEL_NAME'], mode))
+            self.writers[mode] = SummaryWriter(os.path.join(self.config['base_log_dir'],self.config['model_name'], mode))
 
     def readlines(self, path):
         with open(path, "r") as f:
@@ -83,7 +85,7 @@ class Trainer:
 
     def loadDataset(self):
         self.dataset = KITTI
-        dataPath = os.environ['DATAPATH']
+        dataPath = self.config['datapath']
         filepath = os.path.join(dataPath, "splits", "eigen_zhou", "{}_files.txt")
         trainFilenames = self.readlines(filepath.format("train"))
         valFilenames = self.readlines(filepath.format("val"))
@@ -124,7 +126,7 @@ class Trainer:
         print(logString.format(self.epoch, batchIdx, samplesPerSec, loss, secondsToHM(totalTime), secondsToHM(timeLeft)))
 
     def saveModel(self):
-        outpath = os.path.join(os.environ['MODEL_PATH'],os.environ['MODEL_NAME'], "weights_{}".format(self.epoch))
+        outpath = os.path.join(self.config['model_path'],self.config['model_name'], "weights_{}".format(self.epoch))
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         for name, model in self.models.items():

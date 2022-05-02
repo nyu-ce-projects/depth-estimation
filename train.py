@@ -1,9 +1,9 @@
 
 import argparse
 
-# from Trainer import Trainer
+from Trainer import Trainer
 
-from utils import load_config
+from configs.config_loader import load_config
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Mondep Configuration')
