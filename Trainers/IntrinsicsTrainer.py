@@ -2,14 +2,17 @@ from Trainers.BaseTrainer import BaseTrainer
 from Models.DisparityAdjustmentV2 import DisparityAdjustment
 from Models.IntrinsicsModel import IntrinsicsModel
 
+import torch
 import torch.nn.functional as F
 
 class IntrinsicsTrainer(BaseTrainer):
     def __init__(self,config):
         super().__init__(config)
 
-        self.models['intrinsics'] = IntrinsicsModel().to(self.device)
-        # self.models["intrinsics"] = self.models["intrinsics"].to(self.device)
+        self.models['intrinsics'] = IntrinsicsModel()  #.to(self.device)
+        self.models["intrinsics"] = self.models["intrinsics"].to(self.device)
+
+        self.setupOptimizer()
 
     def predictPoses(self, inputs, features):
         outputs = {}
