@@ -9,7 +9,8 @@ import torchvision.transforms as T
 from utils import pilLoader
 
 class CustomDataset(data.Dataset):
-    def __init__(self, dataPath, filenames, height, width, frameIdxs, numScales, train=False):
+    def __init__(self, dataPath, filenames, height, width, frameIdxs, numScales, train=False,
+                 k_trainable=False):
         super(CustomDataset, self).__init__()
         self.dataPath = dataPath
         self.filenames = filenames
@@ -18,6 +19,7 @@ class CustomDataset(data.Dataset):
         self.frameIdxs = frameIdxs
         self.numScales = numScales
         self.train = train
+        self.k_trainable = k_trainable
         #self.interpolation = pil.ANTIALIAS
         self.interpolation = T.InterpolationMode.LANCZOS
         self.loader = pilLoader
@@ -75,9 +77,10 @@ class CustomDataset(data.Dataset):
                 inputs[("color", fi, -1)] = self.getColor(directory, frameIdx, otherSide, flipFlag)
             else:
                 inputs[("color", fi, -1)] = self.getColor(directory, frameIdx + fi, side, flipFlag)
-        for scale in range(self.numScales):
-            inputs[("K", scale)] = torch.clone(self.K_scaled[scale])
-            inputs[("inv_K", scale)] = torch.clone(self.in_K_scaled[scale])
+        if not self.k_trainable:
+            for scale in range(self.numScales):
+                inputs[("K", scale)] = torch.clone(self.K_scaled[scale])
+                inputs[("inv_K", scale)] = torch.clone(self.in_K_scaled[scale])
         colorAugmentations = (lambda x: x)
         if colorAugmentationsFlag:
             colorAugmentations = T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)

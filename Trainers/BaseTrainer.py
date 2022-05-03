@@ -98,15 +98,16 @@ class BaseTrainer:
     def loadDataset(self):
         self.dataset = KITTI
         dataPath = self.config['datapath']
+        k_trainable = self.config['k_trainable']
         filepath = os.path.join(dataPath, "splits", "eigen_zhou", "{}_files.txt")
         trainFilenames = self.readlines(filepath.format("train"))
         valFilenames = self.readlines(filepath.format("val"))
         numTrain = len(trainFilenames)
         self.numSteps = (numTrain//self.batchSize)*self.epochs
         trainDataset = self.dataset(dataPath, trainFilenames, self.height, self.width,
-                                    self.frameIdxs, 4, True)
+                                    self.frameIdxs, 4, True, k_trainable=k_trainable)
         valDataset = self.dataset(dataPath, valFilenames, self.height, self.width, self.frameIdxs,
-                                  4, False)
+                                  4, False, k_trainable=k_trainable)
         self.trainLoader = DataLoader(trainDataset, self.batchSize, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
         self.valLoader = DataLoader(valDataset, self.batchSize, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
         self.valIterator = iter(self.valLoader)
@@ -235,7 +236,7 @@ class BaseTrainer:
     def generateImagePredictions(self, inputs, outputs):
         for scale in range(self.numScales):
             disp = outputs[("disp", scale)]
-            
+
             disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",
                                  align_corners=False)
 
