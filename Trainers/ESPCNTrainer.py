@@ -9,7 +9,7 @@ class ESPCNTrainer(BaseTrainer):
         super().__init__(config)
 
         self.models["decoder"] = DepthDecoderModelESPCN(self.models["encoder"].numChannels)
-
+        self.models["decoder"] = self.models["decoder"].to(self.device)
         #Disparity Adjustment Model
         self.disparityadjustment = DisparityAdjustment(self.device)
 
