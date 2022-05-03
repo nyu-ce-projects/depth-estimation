@@ -26,7 +26,7 @@ class CamNetTrainer(BaseTrainer):
                 poseInputs = [poseFeatures[fi][0], poseFeatures[0][0]]
             else:
                 poseInputs = [poseFeatures[0][0], poseFeatures[fi][0]]
-            poseInputs = torch.cat(poseInput, dim=1)
+            poseInputs = torch.cat(poseInputs, dim=1)
             axisangle, translation, _, K = self.models["pose"](poseInputs)
             outputs[("axisangle", 0, fi)] = axisangle
             outputs[("translation", 0, fi)] = translation

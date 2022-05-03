@@ -53,6 +53,10 @@ class CameraIntrinsics(nn.Module):
         self.last_col = torch.Tensor([[[0.0], [0.0], [0.0], [1.0]]])
 
     def forward(self, bottleneck):
+        self.scaling = self.scaling.to(bottleneck.device)
+        self.last_2nd_row = self.last_2nd_row.to(bottleneck.device)
+        self.last_row = self.last_row.to(bottleneck.device)
+        self.last_col = self.last_col.to(bottleneck.device)
         focal_lengths = self.focal_lengths_conv(bottleneck).squeeze(3).squeeze(2)
         focal_lengths *= self.scaling
         offsets = self.offsets_conv(bottleneck).squeeze(3).squeeze(2) + 0.5
@@ -63,9 +67,7 @@ class CameraIntrinsics(nn.Module):
         last_2nd_row = torch.tile(self.last_2nd_row, [bottleneck.shape[0], 1, 1])
         last_row = torch.tile(self.last_row, [bottleneck.shape[0], 1, 1])
         last_col = torch.tile(self.last_col, [bottleneck.shape[0], 1, 1])
-        print(last_col.shape)
         intrinsic_mat = torch.cat([intrinsic_mat, last_2nd_row, last_row], dim=1)
-        print(intrinsic_mat.shape)
         intrinsic_mat = torch.cat([intrinsic_mat, last_col], dim=2)
         return intrinsic_mat
 
@@ -119,7 +121,7 @@ class CameraNet(nn.Module):
             residual_translation = self.refineMotionField6(residual_translation, in_tensor)
         else:
             residual_translation = None
-        return rotation.unsqueeze(0).unsqueeze(0), translation.permute(0, 2, 3, 1), residual_translation, intrinsics
+        return rotation.unsqueeze(1).unsqueeze(1), translation.permute(0, 2, 3, 1), residual_translation, intrinsics
 
 
 if __name__ == "__main__":
