@@ -46,7 +46,7 @@ class CameraIntrinsics(nn.Module):
         super(CameraIntrinsics, self).__init__()
         self.focal_lengths_conv = nn.Conv2d(bottleneck_channels, 2, (1, 1), stride=1)
         self.focal_lengths_act = nn.Softplus()
-        self.offsets_conv = nn.Conv2d(bottleneck_channels, 2, (1, 1), stride=1)
+        self.offsets_conv = nn.Conv2d(bottleneck_channels, 2, (1, 1), stride=1, bias=False)
         self.scaling = torch.from_numpy(np.array([[w, h]])).float()
         self.last_2nd_row = torch.Tensor([[[0.0, 0.0, 1.0]]])
         self.last_row = torch.Tensor([[[0.0, 0.0, 0.0]]])
@@ -57,7 +57,7 @@ class CameraIntrinsics(nn.Module):
         self.last_2nd_row = self.last_2nd_row.to(bottleneck.device)
         self.last_row = self.last_row.to(bottleneck.device)
         self.last_col = self.last_col.to(bottleneck.device)
-        focal_lengths = self.focal_lengths_conv(bottleneck).squeeze(3).squeeze(2)
+        focal_lengths = self.focal_lengths_act(self.focal_lengths_conv(bottleneck)).squeeze(3).squeeze(2)
         focal_lengths *= self.scaling
         offsets = self.offsets_conv(bottleneck).squeeze(3).squeeze(2) + 0.5
         offsets *= self.scaling
@@ -83,7 +83,7 @@ class CameraNet(nn.Module):
         self.conv3 = ConvBlock(32, 64)
         self.conv4 = ConvBlock(64, 128)
         self.conv5 = ConvBlock(128, 256)
-        self.backgroundMotion = nn.Conv2d(256, 6, (1, 1), stride=1)
+        self.backgroundMotion = nn.Conv2d(256, 6, (1, 1), stride=1, bias=False)
         self.cameraIntrinsics = CameraIntrinsics(self.conv5.out_channels, h, w)
         if self.refine:
             self.refineMotionField1 = RefineMotionField(3, self.conv5.out_channels)
