@@ -27,10 +27,18 @@ class CustomDataset(data.Dataset):
         self.saturation = (0.8, 1.2)
         self.hue = (-0.1, 0.1)
         self.resize = {}
+        self.K_scaled = {}
+        self.inv_K_scaled = {}
         for scaleNum in range(self.numScales):
             scale = 2**scaleNum
             self.resize[scaleNum] = T.Resize((self.height//scale, self.width//scale),
                                              interpolation=self.interpolation)
+            intrinsics = self.K.copy()
+            intrinsics[0, :] *= self.width//scale
+            intrinsics[1, :] *= self.height//scale
+            self.K_scaled[scaleNum] = torch.from_numpy(intrinsics)
+            inverse_intrinsics = np.linalg.pinv(intrinsics)
+            self.inv_K_scaled[scaleNum] = torch.from_numpy(inverse_intrinsics)
         self.loadDepth = self.checkDepth()
 
     def preprocess(self, inputs, colorAugmentations):
@@ -68,12 +76,8 @@ class CustomDataset(data.Dataset):
             else:
                 inputs[("color", fi, -1)] = self.getColor(directory, frameIdx + fi, side, flipFlag)
         for scale in range(self.numScales):
-            K = self.K.copy()
-            K[0, :] *= self.width//(2**scale)
-            K[1, :] *= self.height//(2**scale)
-            inverseK = np.linalg.pinv(K)
-            inputs[("K", scale)] = torch.from_numpy(K)
-            inputs[("inv_K", scale)] = torch.from_numpy(inverseK)
+            inputs[("K", scale)] = torch.clone(self.K_scaled[scale])
+            inputs[("inv_K", scale)] = torch.clone(self.in_K_scaled[scale])
         colorAugmentations = (lambda x: x)
         if colorAugmentationsFlag:
             colorAugmentations = T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)
