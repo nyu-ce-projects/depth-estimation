@@ -10,7 +10,7 @@ from utils import pilLoader
 
 class CustomDataset(data.Dataset):
     def __init__(self, dataPath, filenames, height, width, frameIdxs, numScales, train=False,
-                 k_trainable=False):
+                 k_trainable=False, K=None):
         super(CustomDataset, self).__init__()
         self.dataPath = dataPath
         self.filenames = filenames
@@ -35,7 +35,7 @@ class CustomDataset(data.Dataset):
             scale = 2**scaleNum
             self.resize[scaleNum] = T.Resize((self.height//scale, self.width//scale),
                                              interpolation=self.interpolation)
-            intrinsics = self.K.copy()
+            intrinsics = K.copy()
             intrinsics[0, :] *= self.width//scale
             intrinsics[1, :] *= self.height//scale
             self.K_scaled[scaleNum] = torch.from_numpy(intrinsics)

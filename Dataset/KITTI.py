@@ -8,11 +8,12 @@ from utils import generateDepthMap
 
 class KITTI(CustomDataset):
     def __init__(self, *args, **kwargs):
+        K = np.array([[0.58, 0.00, 0.50, 0.00],
+                      [0.00, 1.92, 0.50, 0.00],
+                      [0.00, 0.00, 1.00, 0.00],
+                      [0.00, 0.00, 0.00, 1.00]], dtype=np.float32)
+        kwargs["K"] = K
         super(KITTI, self).__init__(*args, **kwargs)
-        self.K = np.array([[0.58, 0.00, 0.50, 0.00],
-                           [0.00, 1.92, 0.50, 0.00],
-                           [0.00, 0.00, 1.00, 0.00],
-                           [0.00, 0.00, 0.00, 1.00]], dtype=np.float32)
         self.fullResolution = (1242, 375)
         self.sideMap = {"2": 2, "3": 3, "l": 2, "r": 3}
 
