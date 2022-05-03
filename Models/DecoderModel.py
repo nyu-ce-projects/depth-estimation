@@ -104,7 +104,9 @@ class PoseDecoderModel(nn.Module):
         self.convs[("pose", 1)] = nn.Conv2d(256, 256, 3, 1, 1)
         self.convs[("pose", 2)] = nn.Conv2d(256, 6*self.numFramesPredict, 1)
         self.relu = nn.ReLU()
+        self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.decoder = nn.ModuleList(list(self.convs.values()))
+
 
     def forward(self, inputFeatures):
         lastFeatures = [feature[-1] for feature in inputFeatures]
@@ -119,4 +121,5 @@ class PoseDecoderModel(nn.Module):
         out = 0.01 * out.view(-1, self.numFramesPredict, 1, 6)
         axisangle = out[..., :3]
         translation = out[..., 3:]
-        return axisangle, translation
+        bottleneck = self.global_pooling(catFeatures)
+        return axisangle, translation, bottleneck
