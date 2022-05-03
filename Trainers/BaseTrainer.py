@@ -72,15 +72,10 @@ class BaseTrainer:
     def getTrainableParams(self):
         self.totalTrainableParams = 0
         self.trainableParameters = []
-        self.trainableParameters += list(self.models["encoder"].parameters())
-        self.totalTrainableParams += sum(p.numel() for p in self.models["encoder"].parameters() if p.requires_grad)
-
-        self.trainableParameters += list(self.models["decoder"].parameters())
-        self.totalTrainableParams += sum(p.numel() for p in self.models["decoder"].parameters() if p.requires_grad)
-
-        self.trainableParameters += list(self.models["pose"].parameters())
-        self.totalTrainableParams += sum(p.numel() for p in self.models["pose"].parameters() if p.requires_grad)
-
+        for key in self.models:
+            self.trainableParameters += list(self.models[key].parameters())
+            self.totalTrainableParams += sum(p.numel() for p in self.models[key].parameters() if p.requires_grad)
+    
     def setupOptimizer(self):
         self.getTrainableParams()
 
