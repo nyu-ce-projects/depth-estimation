@@ -221,7 +221,7 @@ class BaseTrainer:
                 poseInputs = [poseFeatures[fi], poseFeatures[0]]
             else:
                 poseInputs = [poseFeatures[0], poseFeatures[fi]]
-            axisangle, translation = self.models["pose"](poseInputs)
+            axisangle, translation,_ = self.models["pose"](poseInputs)
             outputs[("axisangle", 0, fi)] = axisangle
             outputs[("translation", 0, fi)] = translation
             outputs[("cam_T_cam", 0, fi)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
