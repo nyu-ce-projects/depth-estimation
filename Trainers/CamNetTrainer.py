@@ -33,8 +33,8 @@ class CamNetTrainer(BaseTrainer):
             outputs[("cam_T_cam", 0, fi)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
             for scaleNum in range(self.numScales):
                 new_K = torch.clone(K)
-                new_K[0, :] = torch.div(new_K[0, :], 2**scaleNum, rounding_mode='floor')
-                new_K[1, :] = torch.div(new_K[1, :], 2**scaleNum, rounding_mode='floor')
+                new_K[:, 0] = torch.div(new_K[:, 0], 2**scaleNum, rounding_mode='floor')
+                new_K[:, 0] = torch.div(new_K[:, 1], 2**scaleNum, rounding_mode='floor')
                 outputs[("K", scaleNum, fi)] = new_K
                 outputs[("inv_K", scaleNum, fi)] = torch.linalg.pinv(outputs[("K", scaleNum, fi)])
         return outputs
