@@ -93,7 +93,7 @@ class DepthDecoderModelESPCN(nn.Module):
         return self.outputs
 
 class PoseDecoderModel(nn.Module):
-    def __init__(self, numChannelsEncoder, numFeatures=2, numFrames=1):
+    def __init__(self, numChannelsEncoder, numFeatures=1, numFrames=2):
         super(PoseDecoderModel, self).__init__()
         self.numChannelsEncoder = numChannelsEncoder
         self.numFeaturesInput = numFeatures

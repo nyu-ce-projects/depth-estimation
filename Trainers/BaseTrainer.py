@@ -21,12 +21,12 @@ from Dataset.KITTI import KITTI
 class BaseTrainer:
     def __init__(self,config):
         self.config = config
-        self.config['lr'] = float(config['lr'])
+        self.LR = float(config['lr'])
         self.batchSize = int(config['batchsize'])
         self.epochs = int(config['epochs'])
         self.height = int(config['height'])
         self.width = int(config['width'])
-        self.frameIdxs = config['frame_ids']
+        self.frameIdxs = [0, -1, 1]
         self.numScales = int(config['numscales'])
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
@@ -48,12 +48,12 @@ class BaseTrainer:
         self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels, 2, 1)
         self.models["pose"] = self.models["pose"].to(self.device)
         
+        self.setupOptimizer()
         
         # Loss, Metrics and Optimizer Init
         self.ssim = SSIM()
         self.ssim = self.ssim.to(self.device)
-        self.setupOptimizer()
-
+        
         self.loadDataset()
         self.depthMetricNames = ["de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
         self.backprojectDepth = {}
@@ -68,7 +68,7 @@ class BaseTrainer:
         self.writers = {}
         for mode in ["train", "val"]:
             self.writers[mode] = SummaryWriter(os.path.join(self.config['base_log_dir'],self.config['model_name'], mode))
-
+    
     def getTrainableParams(self):
         self.totalTrainableParams = 0
         self.trainableParameters = []
@@ -78,12 +78,11 @@ class BaseTrainer:
     
     def setupOptimizer(self):
         self.getTrainableParams()
-
-        print(self.config['lr'])
-
-        self.optimizer = eval("optim."+self.config['optimizer'])(self.trainableParameters, lr=self.config['lr'], weight_decay=float(self.config['optim_weight_decay']))
-        self.lrScheduler = eval("optim.lr_scheduler."+self.config['lr_scheduler'])(self.optimizer, int(self.config['lr_scheduler_steps']), float(self.config['lr_scheduler_decay']))
-        
+        # print(self.config['lr'])
+        # self.optimizer = eval("optim."+self.config['optimizer'])(self.trainableParameters, lr=self.config['lr'], weight_decay=float(self.config['optim_weight_decay']))
+        # self.lrScheduler = eval("optim.lr_scheduler."+self.config['lr_scheduler'])(self.optimizer, int(self.config['lr_scheduler_steps']), float(self.config['lr_scheduler_decay']))
+        self.optimizer = optim.AdamW(self.trainableParameters, lr=self.LR, betas=(0.9, 0.999), weight_decay=float(self.config['optim_weight_decay']))
+        self.lrScheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, 20)
 
     def readlines(self, path):
         with open(path, "r") as f:
@@ -230,10 +229,8 @@ class BaseTrainer:
     def generateImagePredictions(self, inputs, outputs):
         for scale in range(self.numScales):
             disp = outputs[("disp", scale)]
-            
             disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",
                                  align_corners=False)
-
             sourceScale = 0
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
             outputs[("depth", 0, scale)] = depth
@@ -244,7 +241,7 @@ class BaseTrainer:
                 outputs[("sample", frameIdx, scale)] = pixelCoordinates
                 outputs[("color", frameIdx, scale)] = F.grid_sample(inputs[("color", frameIdx, sourceScale)],
                                                                     outputs[(("sample", frameIdx, scale))],
-                                                                    padding_mode="border")
+                                                                    padding_mode="border", align_corners=False)
                 outputs[("color_identity", frameIdx, scale)] = inputs[("color", frameIdx, sourceScale)]
 
     def computeDepthErrors(self, depthGroundTruth, depthPred):
@@ -320,7 +317,6 @@ class BaseTrainer:
                 toOptimise, idxs = torch.min(combined, dim=1)
             outputs["identity_selection/{}".format(scale)] = (idxs > identityReprojectionLoss.shape[1] - 1).float()
             loss += toOptimise.mean()
-
             meanDisp = disp.mean(2, True).mean(3, True)
             normDisp = disp / (meanDisp + 1e-7)
             smoothLoss = self.getSmoothLoss(normDisp, color)
@@ -389,7 +385,3 @@ class BaseTrainer:
             self.log("val", inputs, outputs, losses)
             del inputs, outputs, losses
         self.setTrain()
-
-if __name__ == "__main__":
-    t = BaseTrainer()
-    t.train()
