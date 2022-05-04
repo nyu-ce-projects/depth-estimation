@@ -23,20 +23,18 @@ class CamNetTrainer(BaseTrainer):
         poseFeatures = {fi: features[fi] for fi in self.frameIdxs}
         for fi in self.frameIdxs[1:]:
             if fi < 0:
-                poseInputs = [poseFeatures[fi][0], poseFeatures[0][0]]
+                poseInputs = [poseFeatures[fi][-1], poseFeatures[0][-1]]
             else:
-                poseInputs = [poseFeatures[0][0], poseFeatures[fi][0]]
+                poseInputs = [poseFeatures[0][-1], poseFeatures[fi][-1]]
             poseInputs = torch.cat(poseInputs, dim=1)
             axisangle, translation, _, K = self.models["pose"](poseInputs)
             outputs[("axisangle", 0, fi)] = axisangle
             outputs[("translation", 0, fi)] = translation
             outputs[("cam_T_cam", 0, fi)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
-            for scaleNum in range(self.numScales):
-                new_K = torch.clone(K)
-                new_K[:, 0] = torch.div(new_K[:, 0], 2**scaleNum, rounding_mode='floor')
-                new_K[:, 0] = torch.div(new_K[:, 1], 2**scaleNum, rounding_mode='floor')
-                outputs[("K", scaleNum, fi)] = new_K
-                outputs[("inv_K", scaleNum, fi)] = torch.linalg.pinv(outputs[("K", scaleNum, fi)])
+            K[:, 0] *= 2**(self.numScales - 1)
+            K[:, 1] *= 2**(self.numScales - 1)
+            outputs[("K", 0, fi)] = K
+            outputs[("inv_K", 0, fi)] = torch.linalg.pinv(K)
         return outputs
 
 
