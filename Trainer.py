@@ -10,10 +10,11 @@ from tensorboardX import SummaryWriter
 from utils import secondsToHM
 
 from Models.EncoderModel import EncoderModel
-from Models.DecoderModel import DepthDecoderModel, PoseDecoderModel
+from Models.DecoderModel import PoseDecoderModel
 from Models.BackprojectDepth import BackprojectDepth
 from Models.Project3D import Project3D
 from Models.DisparityAdjustmentV2 import DisparityAdjustment
+from Models.dpt.models import DPTDepthModel
 
 from Losses.SSIM import SSIM
 
@@ -37,17 +38,17 @@ class Trainer:
         self.trainableParameters = []
 
         # Depth Estimation Model Initialization
+        self.models["depth"] = DPTDepthModel(backbone="vitl16_384",non_negative=True,enable_attention_hooks=False,)
+        self.models["depth"] = self.models["depth"].to(self.device)
+        self.trainableParameters += list(self.models["depth"].parameters())
+        self.totalTrainableParams += sum(p.numel() for p in self.models["depth"].parameters() if p.requires_grad)
+        
+        # Pose Estimation Model Initialization
         self.models["encoder"] = EncoderModel(50)
         self.models["encoder"] = self.models["encoder"].to(self.device)
         self.trainableParameters += list(self.models["encoder"].parameters())
         self.totalTrainableParams += sum(p.numel() for p in self.models["encoder"].parameters() if p.requires_grad)
-        
-        self.models["decoder"] = DepthDecoderModel(self.models["encoder"].numChannels)
-        self.models["decoder"] = self.models["decoder"].to(self.device)
-        self.trainableParameters += list(self.models["decoder"].parameters())
-        self.totalTrainableParams += sum(p.numel() for p in self.models["decoder"].parameters() if p.requires_grad)
-        
-        # Pose Estimation Model Initialization
+
         self.models["pose"] = PoseDecoderModel(self.models["encoder"].numChannels, 2, 1)
         self.models["pose"] = self.models["pose"].to(self.device)
         self.trainableParameters += list(self.models["pose"].parameters())
@@ -337,7 +338,7 @@ class Trainer:
         features = {}
         for i, frameIdx in enumerate(self.frameIdxs):
             features[frameIdx] = [f[i] for f in allFrameFeatures]
-        outputs = self.models["decoder"](features[0])
+        outputs = self.models["depth"](features[0])
         outputs.update(self.predictPoses(inputs, features))
         self.generateImagePredictions(inputs, outputs)
         losses = self.computeLosses(inputs, outputs)

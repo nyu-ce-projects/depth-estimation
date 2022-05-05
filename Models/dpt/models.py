@@ -49,7 +49,7 @@ class DPT(BaseModel):
         self.pretrained, self.scratch = _make_encoder(
             backbone,
             features,
-            False,  # Set to true of you want to train from scratch, uses ImageNet weights
+            True,  # Set to true of you want to train from scratch, uses ImageNet weights
             groups=1,
             expand=False,
             exportable=False,
@@ -121,33 +121,3 @@ class DPTDepthModel(DPT):
             return depth
         else:
             return inv_depth
-
-
-class DPTSegmentationModel(DPT):
-    def __init__(self, num_classes, path=None, **kwargs):
-
-        features = kwargs["features"] if "features" in kwargs else 256
-
-        kwargs["use_bn"] = True
-
-        head = nn.Sequential(
-            nn.Conv2d(features, features, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(features),
-            nn.ReLU(True),
-            nn.Dropout(0.1, False),
-            nn.Conv2d(features, num_classes, kernel_size=1),
-            Interpolate(scale_factor=2, mode="bilinear", align_corners=True),
-        )
-
-        super().__init__(head, **kwargs)
-
-        self.auxlayer = nn.Sequential(
-            nn.Conv2d(features, features, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(features),
-            nn.ReLU(True),
-            nn.Dropout(0.1, False),
-            nn.Conv2d(features, num_classes, kernel_size=1),
-        )
-
-        if path is not None:
-            self.load(path)
