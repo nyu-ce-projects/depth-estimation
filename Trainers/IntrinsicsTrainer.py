@@ -22,41 +22,34 @@ class IntrinsicsTrainer(BaseTrainer):
                 poseInputs = [poseFeatures[fi], poseFeatures[0]]
             else:
                 poseInputs = [poseFeatures[0], poseFeatures[fi]]
-            axisangle, translation,bottleneck = self.models["pose"](poseInputs)
-            outputs[("axisangle", 0, fi)] = axisangle
-            outputs[("translation", 0, fi)] = translation
-            outputs[("cam_T_cam", 0, fi)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
-            outputs[("bottleneck", 0, fi)] = bottleneck
+            axisangle, translation,_ = self.models["pose"](poseInputs)
+            outputs[("axisangle", fi, 0)] = axisangle
+            outputs[("translation", fi, 0)] = translation
+            outputs[("cam_T_cam", fi, 0)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
+            outputs[("bottleneck", fi, 0)] = bottleneck
         return outputs
 
     def generateImagePredictions(self, inputs, outputs):
         for scale in range(self.numScales):
-
-            # # Disparity Adjustment
+            # Disparity Adjustment
             # orig_scaled_images = inputs[("color", 0, scale)]
             # outputs[("disp", scale)] = self.disparityadjustment(orig_scaled_images,outputs[("disp", scale)])
-
             disp = outputs[("disp", scale)]
-            
-            disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",
-                                 align_corners=False)
-
+            disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",align_corners=False)
             sourceScale = 0
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
             outputs[("depth", 0, scale)] = depth
             for i, frameIdx in enumerate(self.frameIdxs[1:]):
-                T = outputs[("cam_T_cam", 0, frameIdx)]
-                bottleneck = outputs[("bottleneck", 0, frameIdx)]
+                bottleneck = outputs[("bottleneck", 0, fi)]
+                T = outputs[("cam_T_cam", frameIdx, 0)]
 
                 # predicit camera intrinsics
-                outputs[("K", 0, frameIdx)] = self.models['intrinsics'](bottleneck, self.width, self.height)
-                outputs[("inv_K", 0, frameIdx)] = torch.inverse(outputs[("K", 0, frameIdx)])
+                outputs[("K", frameIdx, 0)] = self.models['intrinsics'](bottleneck, self.width, self.height)
+                outputs[("inv_K", frameIdx, 0)] = torch.inverse(outputs[("K", frameIdx, 0)])
 
-                cameraPoints = self.backprojectDepth[sourceScale](depth, outputs[("inv_K", 0, frameIdx)])
-                pixelCoordinates = self.project3d[sourceScale](cameraPoints, outputs[("K", 0, frameIdx)], T)
-                
+                cameraPoints = self.backprojectDepth[sourceScale](depth, outputs[("inv_K", frameIdx, 0)])
+                pixelCoordinates = self.project3d[sourceScale](cameraPoints, outputs[("K", frameIdx, 0)], T)
                 outputs[("sample", frameIdx, scale)] = pixelCoordinates
-                outputs[("color", frameIdx, scale)] = F.grid_sample(inputs[("color", frameIdx, sourceScale)],
-                                                                    outputs[(("sample", frameIdx, scale))],
-                                                                    padding_mode="border")
-                outputs[("color_identity", frameIdx, scale)] = inputs[("color", frameIdx, sourceScale)]
+                outputs[("color", frameIdx, scale)] = F.grid_sample(inputs[("color", frameIdx, sourceScale)],outputs[(("sample", frameIdx, scale))],padding_mode="border", align_corners=False)
+                outputs[("color_identity", frameIdx, scale)] = inputs[("color", frameIdx, sourceScale)]   
+    
