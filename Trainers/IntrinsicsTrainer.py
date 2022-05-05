@@ -22,7 +22,7 @@ class IntrinsicsTrainer(BaseTrainer):
                 poseInputs = [poseFeatures[fi], poseFeatures[0]]
             else:
                 poseInputs = [poseFeatures[0], poseFeatures[fi]]
-            axisangle, translation,_ = self.models["pose"](poseInputs)
+            axisangle, translation,bottleneck = self.models["pose"](poseInputs)
             outputs[("axisangle", fi, 0)] = axisangle
             outputs[("translation", fi, 0)] = translation
             outputs[("cam_T_cam", fi, 0)] = self.transformParameters(axisangle[:, 0], translation[:, 0], invert=(fi<0))
@@ -40,7 +40,7 @@ class IntrinsicsTrainer(BaseTrainer):
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
             outputs[("depth", 0, scale)] = depth
             for i, frameIdx in enumerate(self.frameIdxs[1:]):
-                bottleneck = outputs[("bottleneck", 0, fi)]
+                bottleneck = outputs[("bottleneck", frameIdx, 0)]
                 T = outputs[("cam_T_cam", frameIdx, 0)]
 
                 # predicit camera intrinsics

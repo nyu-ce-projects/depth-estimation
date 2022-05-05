@@ -13,7 +13,7 @@ def getTrainer(config):
         # nohup python -u train.py --model ESPCN > output_espcn.log &
         return ESPCNTrainer(config)
     elif config['model_name']=='CAMLESS':
-        # nohup python -u train.py --model CAMLESS > output_camnet.log &
+        # nohup python -u train.py --model CAMLESS > output_camless.log &
         return IntrinsicsTrainer(config)
     elif config['model_name']=='MONODEPTH2':
         # nohup python -u train.py --model MONODEPTH2 > output_monodepth2.log &
