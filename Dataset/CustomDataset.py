@@ -1,15 +1,17 @@
 import random
+random.seed(7)
 import PIL.Image as pil
 
 import numpy as np
 import torch
 import torch.utils.data as data
 import torchvision.transforms as T
+import albumentations as A
 
 from utils import pilLoader
 
 class CustomDataset(data.Dataset):
-    def __init__(self, dataPath, filenames, height, width, frameIdxs, numScales, train=False):
+    def __init__(self, dataPath, filenames, height, width, frameIdxs, numScales, train=False, weather_aug=False):
         super(CustomDataset, self).__init__()
         self.dataPath = dataPath
         self.filenames = filenames
@@ -18,6 +20,7 @@ class CustomDataset(data.Dataset):
         self.frameIdxs = frameIdxs
         self.numScales = numScales
         self.train = train
+        self.weather_aug = weather_aug
         #self.interpolation = pil.ANTIALIAS
         self.interpolation = T.InterpolationMode.LANCZOS
         self.loader = pilLoader
@@ -31,9 +34,16 @@ class CustomDataset(data.Dataset):
             scale = 2**scaleNum
             self.resize[scaleNum] = T.Resize((self.height//scale, self.width//scale),
                                              interpolation=self.interpolation)
+        self.transforms =   {
+                            "ColorJitter": T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue),
+                            "RandomRain": A.RandomRain(brightness_coefficient=0.9, drop_width=1, blur_value=5, p=1),
+                            "RandomSnow": A.RandomSnow(brightness_coeff=2.5, snow_point_lower=0.3, snow_point_upper=0.5, p=1),
+                            "RandomFog": A.RandomFog(fog_coef_lower=0.5, fog_coef_upper=0.6, alpha_coef=0.1, p=1),
+                            "RandomSunFlare": A.RandomSunFlare(flare_roi=(0, 0, 1, 0.5), angle_lower=0.5, src_radius=200, p=1)
+                            }
         self.loadDepth = self.checkDepth()
 
-    def preprocess(self, inputs, colorAugmentations):
+    def preprocess(self, inputs, colorAugmentations, weatherAugmentations):
         for k in list(inputs):
             frame = inputs[k]
             if "color" in k:
@@ -45,7 +55,12 @@ class CustomDataset(data.Dataset):
             if "color" in k:
                 n, im, i = k
                 inputs[(n, im, i)] = self.toTensor(frame)
-                inputs[(n + "_aug", im, i)] = self.toTensor(colorAugmentations(frame))
+                frame = colorAugmentations(frame)
+                if weatherAugmentations:
+                    weatherAugmentations = A.Compose(weatherAugmentations)
+                    frame = weatherAugmentations(image=np.array(frame))
+                    frame = pil.fromarray(frame['image'])
+                inputs[(n + "_aug", im, i)] = self.toTensor(frame)
 
     def __len__(self):
         return len(self.filenames)
@@ -76,8 +91,23 @@ class CustomDataset(data.Dataset):
             inputs[("inv_K", scale)] = torch.from_numpy(inverseK)
         colorAugmentations = (lambda x: x)
         if colorAugmentationsFlag:
-            colorAugmentations = T.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue)
-        self.preprocess(inputs, colorAugmentations)
+            colorAugmentations = self.transforms['ColorJitter']
+        weatherAugmentations = []
+        if self.weather_aug:
+            # TODO - Make Realistic Weather Augmentations (Combinations of Rain, Snow, Fog, SunFlare)
+            rainFlag = self.train and random.random() > 0.8
+            snowFlag = self.train and random.random() > 0.8
+            fogFlag = self.train and random.random() > 0.8
+            sunFlareFlag = self.train and random.random() > 0.8
+            if rainFlag:
+                weatherAugmentations.append(self.transforms["RandomRain"])
+            if snowFlag:
+                weatherAugmentations.append(self.transforms["RandomSnow"])
+            if fogFlag:
+                weatherAugmentations.append(self.transforms["RandomFog"])
+            if sunFlareFlag:
+                weatherAugmentations.append(self.transforms["RandomSunFlare"])
+        self.preprocess(inputs, colorAugmentations, weatherAugmentations)
         for fi in self.frameIdxs:
             del inputs[("color", fi, -1)]
             del inputs[("color_aug", fi, -1)]

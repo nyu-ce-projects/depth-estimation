@@ -97,10 +97,11 @@ class BaseTrainer:
         valFilenames = self.readlines(filepath.format("val"))
         numTrain = len(trainFilenames)
         self.numSteps = (numTrain//self.batchSize)*self.epochs
+        weather_aug = self.config.get("weather_aug", False)
         trainDataset = self.dataset(dataPath, trainFilenames, self.height, self.width,
-                                    self.frameIdxs, 4, True)
+                                    self.frameIdxs, 4, True, weather_aug)
         valDataset = self.dataset(dataPath, valFilenames, self.height, self.width, self.frameIdxs,
-                                  4, False)
+                                  4, False, False)
         self.trainLoader = DataLoader(trainDataset, self.batchSize, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
         self.valLoader = DataLoader(valDataset, self.batchSize, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
         self.valIterator = iter(self.valLoader)
