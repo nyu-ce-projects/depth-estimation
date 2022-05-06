@@ -1,4 +1,4 @@
-# MonDep - Monocular Depth Estimation using Self-Supervised Learning 
+# Monocular Depth Estimation using Self-Supervised Learning 
 
 * [Environment Setup](#env)
 
