@@ -4,6 +4,8 @@ import argparse
 from Trainers.Trainer import getTrainer
 
 from configs.config_loader import load_config
+from tboard import initiateTensorboard
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Mondep Configuration')
@@ -16,8 +18,8 @@ if __name__ == "__main__":
         help="model name"
     )
     parser.add_argument("-tb", "--tensorboard", action="store_true", dest="tb_flag",help="tensorboard flag")
-	parser.add_argument("-tbpth", "--tensorboard_path", action="store", dest="tb_path",help="tensorboard path")
-	args = parser.parse_args()
+    parser.add_argument("-tbpth", "--tensorboard_path", action="store", dest="tb_path",help="tensorboard path")
+    args = parser.parse_args()
     
     initiateTensorboard(args.tb_flag,args.tb_path)
 
