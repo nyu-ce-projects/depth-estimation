@@ -15,7 +15,12 @@ if __name__ == "__main__":
         "-m", "--model", action="store", dest="model",
         help="model name"
     )
-    args = parser.parse_args()
+    parser.add_argument("-tb", "--tensorboard", action="store_true", dest="tb_flag",help="tensorboard flag")
+	parser.add_argument("-tbpth", "--tensorboard_path", action="store", dest="tb_path",help="tensorboard path")
+	args = parser.parse_args()
+    
+    initiateTensorboard(args.tb_flag,args.tb_path)
+
     config = load_config(config_path=args.conf_file,model_name=args.model)
     net = getTrainer(config)
 
