@@ -28,7 +28,7 @@ class MaskTrainer(BaseTrainer):
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
             outputs[("depth", 0, scale)] = depth
             for i, frameIdx in enumerate(self.frameIdxs[1:]):
-                T = outputs[("cam_T_cam", 0, frameIdx)]
+                T = outputs[("cam_T_cam", frameIdx, 0)]
                 cameraPoints = self.backprojectDepth[sourceScale](depth, inputs[("inv_K", sourceScale)])
                 pixelCoordinates = self.project3d[sourceScale](cameraPoints, inputs[("K", sourceScale)], T)
                 outputs[("sample", frameIdx, scale)] = pixelCoordinates

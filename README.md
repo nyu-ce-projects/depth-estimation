@@ -22,5 +22,5 @@ python train.py --model MONODEPTH2 --conf configs/model_config.cfg
 To run in background
 
 ```
-nohup python train.py --model MONODEPTH2 > output.log &
+nohup python -u train.py --model MONODEPTH2 > output.log &
 ```
