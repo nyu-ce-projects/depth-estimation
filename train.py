@@ -27,3 +27,5 @@ if __name__ == "__main__":
     net = getTrainer(config)
 
     net.train()
+
+    print("Model Training Completed: ",config['model_name'])
