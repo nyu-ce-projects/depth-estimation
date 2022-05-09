@@ -225,12 +225,8 @@ class DPTrainer:
 
             # Disparity Adjustment
             orig_scaled_images = inputs[("color", 0, scale)]
-            outputs[("disp", scale)] = self.disparityadjustment(orig_scaled_images,outputs[("disp", scale)])
-
             disp = outputs[("disp", scale)]
-            
-            disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",
-                                 align_corners=False)
+            #disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",align_corners=False)
 
             sourceScale = 0
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
@@ -330,6 +326,7 @@ class DPTrainer:
         return losses
 
     def processBatch(self, inputs):
+        outputs = {}
         for key, value in inputs.items():
             inputs[key] = value.to(self.device)
         origScaleColorAug = torch.cat([inputs[("color_aug", fi, 0)] for fi in self.frameIdxs])
@@ -338,7 +335,8 @@ class DPTrainer:
         features = {}
         for i, frameIdx in enumerate(self.frameIdxs):
             features[frameIdx] = [f[i] for f in allFrameFeatures]
-        outputs = self.models["depth"](features[0])
+        predictions = self.models["depth"](origScaleColorAug) 
+        outputs[("disp", 0)] = predictions
         outputs.update(self.predictPoses(inputs, features))
         self.generateImagePredictions(inputs, outputs)
         losses = self.computeLosses(inputs, outputs)
