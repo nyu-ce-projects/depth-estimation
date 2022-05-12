@@ -22,7 +22,7 @@ def getTrainer(config):
     elif config['model_name']=='MASKCAMLESS':
         # nohup python -u train.py --model MASKCAMLESS > output_maskcamless.log &
         return MaskCamlessTrainer(config)
-    elif config['model_name']=='MASKCAMLESS_ESPCN':
+    elif config['model_name']=='MASKCAMLESS_ESPCN' or config['model_name']=='MASKCAMLESS_ESPCN_WEATHER':
         # nohup python -u train.py --model MASKCAMLESS_ESPCN > output_maskcamless_espcn.log &
         return MaskCamlessTrainer(config)
     elif config['model_name']=='MONODEPTH2':

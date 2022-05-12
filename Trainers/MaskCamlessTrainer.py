@@ -41,9 +41,9 @@ class MaskCamlessTrainer(BaseTrainer):
         for scale in range(self.numScales):
             # Disparity Adjustment
             orig_scaled_images = inputs[("color", 0, scale)]
-            outputs[("disp", scale)] = self.disparityadjustment(orig_scaled_images,outputs[("disp", scale)])
+            disp = self.disparityadjustment(orig_scaled_images,outputs[("disp", scale)])
 
-            disp = outputs[("disp", scale)]
+            # disp = outputs[("disp", scale)]
             disp = F.interpolate(disp, [self.height, self.width], mode="bilinear",align_corners=False)
             sourceScale = 0
             _, depth = self.dispToDepth(disp, 0.1, 100.0)
