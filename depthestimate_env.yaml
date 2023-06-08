@@ -11,8 +11,11 @@ dependencies:
   - torchaudio
   - cudatoolkit=11.3
   - pip:
+    - wheel
     - python-dotenv
     - tensorboardx
     - scikit-image
     - matplotlib
+    - tensorboard
+    - albumentation
 
