@@ -2,7 +2,7 @@
 
 * [Environment Setup](#env)
 
-
+[Paper Link](https://arxiv.org/ftp/arxiv/papers/2304/2304.06966.pdf)
 
 # Environment Setup
 
